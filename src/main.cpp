@@ -1,6 +1,11 @@
 #include "nvim/nvim.h"
 #include "renderer/renderer.h"
 
+#include <string>
+#include <shlwapi.h>
+
+#pragma comment(lib, "Shlwapi.lib")
+
 struct Context {
 	bool start_maximized;
 	bool start_fullscreen;
@@ -392,6 +397,13 @@ BOOL ShouldUseDarkMode()
 	return false;
 }
 
+int64_t ReadInt64FromIni(const wchar_t* section, const wchar_t* key, int64_t default_value, const wchar_t* filename) {
+	wchar_t buffer[32];
+	GetPrivateProfileStringW(section, key, nullptr, buffer, 32, filename);
+	if (wcslen(buffer) == 0) return default_value;
+	return _wtoi64(buffer);
+}
+
 int WINAPI wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev_instance, _In_ LPWSTR p_cmd_line, _In_ int n_cmd_show) {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
@@ -400,12 +412,31 @@ int WINAPI wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev_instance, _
 	bool start_maximized = false;
 	bool start_fullscreen = false;
 	bool disable_ligatures = false;
-  bool disable_fullscreen = false;
-	float linespace_factor = 1.0f;
-	int64_t start_rows = 0;
-	int64_t start_cols = 0;
-	int64_t start_pos_x = CW_USEDEFAULT;
-	int64_t start_pos_y = CW_USEDEFAULT;
+	bool disable_fullscreen = false;
+
+	float linespace_factor = 0.9f;
+	int64_t start_rows = 64;
+	int64_t start_cols = 160;
+	int64_t start_pos_x = 550;
+	int64_t start_pos_y = 65;
+	int64_t screen_width = 2560;
+	wchar_t exe_path[MAX_PATH];
+	GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+	PathRemoveFileSpecW(exe_path);
+	std::wstring config_path = std::wstring(exe_path) + L"\\nvy.ini";
+	start_rows = ReadInt64FromIni(L"Window", L"start_rows", start_rows, config_path.c_str());
+	start_cols = ReadInt64FromIni(L"Window", L"start_cols", start_cols, config_path.c_str());
+	start_pos_y = ReadInt64FromIni(L"Window", L"start_pos_y", start_pos_y, config_path.c_str());
+	start_pos_x = ReadInt64FromIni(L"Window", L"start_pos_x", start_pos_x, config_path.c_str());
+	screen_width = ReadInt64FromIni(L"Window", L"screen_width", screen_width, config_path.c_str());
+
+	POINT cursor_pos;
+	GetCursorPos(&cursor_pos);
+
+	if (cursor_pos.x > screen_width) {
+	    start_pos_x += screen_width;
+	}
+
 	bool enable_cursor_timeout = false;
 	uint32_t cursor_timeout_in_ms = 0;
 
